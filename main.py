@@ -2,8 +2,11 @@
 import os
 from imaplib import IMAP4_SSL
 import email
-# External Libraries
+from collections.abc import Iterable
+# Third-Party Libraries
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+
 
 load_dotenv()
 
@@ -16,10 +19,18 @@ def connect_to_email() -> IMAP4_SSL:
     mail.select("inbox")
     return mail
 
+def extract_links_from_html(html_content: str) -> Iterable:
+    soup: BeautifulSoup = BeautifulSoup(html_content, "html.parser")
+    links = [link["href"] for link in soup.find_all("a", href=True) if "unsubscribe" in link["href"].lower()]
+    return links
+
+
 def search_for_email():
     mail = connect_to_email()
     _, search_data = mail.search(None, '(BODY "unsubscribe")')
     data = search_data[0].split()
+
+    links = []
 
     for num in data:
         _, data = mail.fetch(num, "(RFC822)")
@@ -28,15 +39,20 @@ def search_for_email():
         if msg.is_multipart():
             for part in msg.walk():
                 if part.get_content_type() == "text/html":
-                    html_content = part.get_payload(decode=True).decode()
-                    print(html_content)
+                    html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    links.extend(extract_links_from_html(html_content))
+                    #print(f"Found unsubscribe links in email: {msg['Subject']}")
         else:
             content_type = msg.get_content_type()
-            content = msg.get_payload(decode=True).decode()
+            content = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
 
             if content_type == "text/html":
-                print(content)
+                links.extend(extract_links_from_html(content))
+                #print("Unsubscribe links found:")
     
     mail.logout()
+    return links
 
-search_for_email()
+if __name__ == "__main__":
+    links = search_for_email()
+    print(links)
