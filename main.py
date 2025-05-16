@@ -2,7 +2,6 @@
 import os
 from imaplib import IMAP4_SSL
 import email
-from collections.abc import Iterable
 # Third-Party Libraries
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
@@ -22,7 +21,7 @@ def connect_to_email() -> IMAP4_SSL:
     return mail
 
 
-def extract_links_from_html(html_content: str) -> Iterable:
+def extract_links_from_html(html_content: str) -> list[str]:
     soup: BeautifulSoup = BeautifulSoup(html_content, "html.parser")
     links = [link["href"] for link in soup.find_all("a", href=True) if "unsubscribe" in link["href"].lower()]
     return links
@@ -67,7 +66,13 @@ def search_for_email():
     return links
 
 
+def save_links(links: list[str]) -> None:
+    with open("links.txt", "w") as file:
+        file.write("\n".join(links))
+
+
 if __name__ == "__main__":
     links = search_for_email()
     for link in links:
         click_link(link)
+    save_links(links)
